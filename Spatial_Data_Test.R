@@ -1,4 +1,6 @@
 ### Setup
+install.packages('spDataLarge',
+                 repos='https://nowosad.github.io/drat/', type='source')
 
 library(tidyverse)
 library(MODISTools)
@@ -8,6 +10,11 @@ library(lubridate)
 library(plyr)
 library(sf)
 library(tmap)
+library(rgdal)
+library(spData)
+library(spDataLarge)
+library(terra)
+library(ggplot2)
 
 ### Extracting Products from MODIS and setting mid point
 
@@ -26,8 +33,8 @@ df_ndvi <- mt_subset(product = "MOD13Q1",               # the chosen product
                      band = "250m_16_days_NDVI",        # chosen band defining spatial and temporal scale
                      start = "2023-05-25",              # start date: 10th June 2022
                      end = "2023-06-10",                # end date: 10th June 2022
-                     km_lr = 15,                        # kilometers left & right of the chosen location (lat/lon above)
-                     km_ab = 15,                        # kilometers above and below the location
+                     km_lr = 60,                        # kilometers left & right of the chosen location (lat/lon above)
+                     km_ab = 60,                        # kilometers above and below the location
                      site_name = "Abtwil (AG)",         # the site name we want to give the data
                      internal = TRUE,
                      progress = FALSE
@@ -37,7 +44,7 @@ df_ndvi <- mt_subset(product = "MOD13Q1",               # the chosen product
 raster_ndvi <- mt_to_terra(df = df_ndvi) # converting subset into raster
 
 ### Plotting Data
-plot(raster_ndvi[[1]], zlim=c(-0.1, 0.95))
+#plot(raster_ndvi[[1]], zlim=c(-0.1, 0.95))
 
 ################################################################################
 switch_on <- 0
@@ -65,9 +72,51 @@ df_ndvi_spatialmean %>%
 ### Gemeinde Grenzen
 Gemeidegrenzen = read_sf("//fibl.ch/FILES/Dep_FSS/2_Projects/2020_CH-SNF_LEAF_35188/02_WorkPackages/WP2_ModelDevelopment/01_Data/00_Public/CH_Gemeindegrenzen/ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill/swissBOUNDARIES3D_1_3_TLM_HOHEITSGEBIET.shp")
 
-tm_shape(Gemeidegrenzen) + 
-  tm_shape(raster_ndvi) +
-  tm_polygons() +
+Gemeidegrenzen <- st_transform(Gemeidegrenzen, "EPSG:4326")
+#tm_shape(Gemeidegrenzen) + 
+  #tm_borders() +
+  #tm_grid()
+
+### Reducing to Gemeinde in Aargau, Luzern, Zürich and Zug
+Study_gemeinde <- Gemeidegrenzen %>% filter(KANTONSNUM %in% c(1, 3, 9, 19))
+
+tm_shape(Study_gemeinde) + 
+  tm_borders() +
+  tm_grid()
+
+#st_crs(ZG_gemeinde)
+
+#cat(crs(raster_ndvi))
+
+raster_ndvi <- project(raster_ndvi, "EPSG:4326", method = "near")
+
+### Bezirksgebiet
+#Bezirksgebiet = read_sf("//fibl.ch/FILES/Dep_FSS/2_Projects/2020_CH-SNF_LEAF_35188/02_WorkPackages/WP2_ModelDevelopment/01_Data/00_Public/CH_Gemeindegrenzen/ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill/swissBOUNDARIES3D_1_3_TLM_BEZIRKSGEBIET.shp")
+
+###
+area <- st_transform(Study_gemeinde, crs(raster_ndvi))
+
+area_cropped <- crop(raster_ndvi, Study_gemeinde)
+
+area_final <- mask(area_cropped, Study_gemeinde)
+
+tm_shape(Study_gemeinde) + 
+  tm_borders() +
   tm_grid()
 
 
+plot(area_final[[1]], zlim=c(-0.1, 0.95))
+
+area_final_df <- as.data.frame(area_final[[1]], xy = TRUE) %>%
+  na.omit()
+
+colnames(area_final_df) <- c("Longitude", "Latitude", "NDVI")
+head(area_final_df)
+
+ggplot() +
+  geom_raster(data = area_final_df, aes(x = Longitude, y = Latitude, fill = NDVI)) +
+  geom_sf(data = Study_gemeinde, fill = NA) + 
+  scale_fill_viridis_c() +
+  theme_bw()
+  
+  
