@@ -1,7 +1,9 @@
 ### Setup
 install.packages('spDataLarge',
                  repos='https://nowosad.github.io/drat/', type='source')
+install.packages('exactextractr')
 
+library(exactextractr)
 library(tidyverse)
 library(MODISTools)
 library(raster)
@@ -15,6 +17,7 @@ library(spData)
 library(spDataLarge)
 library(terra)
 library(ggplot2)
+
 
 ### Extracting Products from MODIS and setting mid point
 
@@ -73,50 +76,85 @@ df_ndvi_spatialmean %>%
 Gemeidegrenzen = read_sf("//fibl.ch/FILES/Dep_FSS/2_Projects/2020_CH-SNF_LEAF_35188/02_WorkPackages/WP2_ModelDevelopment/01_Data/00_Public/CH_Gemeindegrenzen/ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill/swissBOUNDARIES3D_1_3_TLM_HOHEITSGEBIET.shp")
 
 Gemeidegrenzen <- st_transform(Gemeidegrenzen, "EPSG:4326")
-#tm_shape(Gemeidegrenzen) + 
-  #tm_borders() +
-  #tm_grid()
+
+Gemeidegrenzen$Inclusion <- ifelse(Gemeidegrenzen$KANTONSNUM %in% c(13), 1, ifelse(Gemeidegrenzen$KANTONSNUM %in% c(11, 2), 2, ifelse(Gemeidegrenzen$KANTONSNUM %in% c(10, 22), 3, ifelse(Gemeidegrenzen$KANTONSNUM %in% c(19, 3, 1, 20), 4, NA ))))
+
+# Plotting gemeinde map
+tm_shape(Gemeidegrenzen) + 
+  tm_polygons(col = "Inclusion",
+              palette = "viridis",
+              legend.show = FALSE) +
+  tm_grid()
+
+tm_shape(Gemeidegrenzen) + 
+  tm_fill(col = "#00247D") +
+  tm_borders() +
+  tm_grid()
 
 ### Reducing to Gemeinde in Aargau, Luzern, Zürich and Zug
 Study_gemeinde <- Gemeidegrenzen %>% filter(KANTONSNUM %in% c(1, 3, 9, 19))
 
+# Plotting gemeinde map
 tm_shape(Study_gemeinde) + 
   tm_borders() +
   tm_grid()
 
+# Checking CRS
 #st_crs(ZG_gemeinde)
 
 #cat(crs(raster_ndvi))
 
+# Changing CRS of NDVI raster
 raster_ndvi <- project(raster_ndvi, "EPSG:4326", method = "near")
 
-### Bezirksgebiet
-#Bezirksgebiet = read_sf("//fibl.ch/FILES/Dep_FSS/2_Projects/2020_CH-SNF_LEAF_35188/02_WorkPackages/WP2_ModelDevelopment/01_Data/00_Public/CH_Gemeindegrenzen/ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill/swissBOUNDARIES3D_1_3_TLM_BEZIRKSGEBIET.shp")
-
-###
+# Changing CRS of shape file
 area <- st_transform(Study_gemeinde, crs(raster_ndvi))
 
+# Cutting to only neeeded parts
 area_cropped <- crop(raster_ndvi, Study_gemeinde)
 
 area_final <- mask(area_cropped, Study_gemeinde)
 
+# Plotting cut version of map
 tm_shape(Study_gemeinde) + 
   tm_borders() +
   tm_grid()
 
-
-plot(area_final[[1]], zlim=c(-0.1, 0.95))
-
+# Converting raster to dataframe
 area_final_df <- as.data.frame(area_final[[1]], xy = TRUE) %>%
   na.omit()
 
 colnames(area_final_df) <- c("Longitude", "Latitude", "NDVI")
 head(area_final_df)
 
+# Plotting NDVI for selected gemeinde
 ggplot() +
   geom_raster(data = area_final_df, aes(x = Longitude, y = Latitude, fill = NDVI)) +
   geom_sf(data = Study_gemeinde, fill = NA) + 
   scale_fill_viridis_c() +
   theme_bw()
-  
-  
+
+# Extracting NDVI to data
+ndvi_values <- terra::extract(x = area_cropped, y = Study_gemeinde)  
+colnames(ndvi_values) <- c("ID", "NDVI_May", "NDVI_June")
+head(ndvi_values)
+
+# Extracting NDVI data and saving to Gemeinde data
+Study_gemeinde$mean_NDVI <- exact_extract(area_cropped[[1]], Study_gemeinde, "mean")
+
+# Calculating mean NDVI
+ndvi_values <- ndvi_values %>%
+  group_by(ID) %>%
+  mutate(mean_NDVI = mean(NDVI_May, na.rm = TRUE))
+
+# Plotting NDVI for selected gemeinde
+ggplot() +
+  geom_raster(data = area_final_df, aes(x = Longitude, y = Latitude, fill = NA)) +
+  geom_sf(data = Study_gemeinde, fill = Study_gemeinde$mean_NDVI) + 
+  scale_fill_viridis_c() +
+  theme_bw()
+
+# Plotting gemeinde map with NDVI
+tm_shape(Study_gemeinde) + 
+  tm_polygons(col = "mean_NDVI", 
+              style = "order")
