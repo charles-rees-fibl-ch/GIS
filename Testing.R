@@ -14,7 +14,7 @@ tm_shape(Bezirksgebiet[Bezirksgebiet$KANTONSNUM==3,]) + # LU=3
 # .. swissBOUNDARIES3D_1_3_TLM_BEZIRKSGEBIET.shp -------------------------------------------------------------
 Gemeidegrenzen = read_sf("//fibl.ch/FILES/Dep_FSS/2_Projects/2020_CH-SNF_LEAF_35188/02_WorkPackages/WP2_ModelDevelopment/01_Data/00_Public/CH_Gemeindegrenzen/ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill/swissBOUNDARIES3D_1_3_TLM_HOHEITSGEBIET.shp")
 
-tm_shape(Gemeidegrenzen[Gemeidegrenzen$KANTONSNUM==3,]) + # LU=3
+tm_shape(Gemeidegrenzen) + # LU=3
   tm_polygons() +
   tm_grid()
 
@@ -30,10 +30,10 @@ tm_shape(Gemeidegrenzen[Gemeidegrenzen$KANTONSNUM==3,]) + # LU=3
 #     st_write(Gesamteinzugsgebiet_117451_Sempachersee,
 #          "//fibl.ch/files/Oekonomie/Projekte-(laufend)/CH-SNF_LEAF/02_WorkPackages/WP2_ModelDevelopment/01_Data/00_Public/CH_Einzugsgebiete/Gesamteinzugsgebiete/gesamtseinzugsgebiete/Gesamteinzugsgebiet_117451_Sempachersee.gpkg")
 
-Gesamteinzugsgebiet_117451_Sempachersee = st_read("//fibl.ch/FILES/Dep_FSS/2_Projects/2020_CH-SNF_LEAF_35188/02_WorkPackages/WP2_ModelDevelopment/01_Data/00_Public/CH_Einzugsgebiete/Gesamteinzugsgebiete/gesamtseinzugsgebiete/Gesamteinzugsgebiet_117451_Sempachersee.gpkg")
+#Gesamteinzugsgebiet_117451_Sempachersee = st_read("//fibl.ch/FILES/Dep_FSS/2_Projects/2020_CH-SNF_LEAF_35188/02_WorkPackages/WP2_ModelDevelopment/01_Data/00_Public/CH_Einzugsgebiete/Gesamteinzugsgebiete/gesamtseinzugsgebiete/Gesamteinzugsgebiet_117451_Sempachersee.gpkg")
 
-tm_shape(Gesamteinzugsgebiet_117451_Sempachersee) + 
-  tm_polygons() +
-  tm_grid()
+#tm_shape(Gesamteinzugsgebiet_117451_Sempachersee) + 
+  #tm_polygons() +
+  #tm_grid()
 
 
